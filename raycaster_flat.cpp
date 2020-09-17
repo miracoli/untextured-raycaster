@@ -26,9 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 #include <iostream>
 #include "libs/FixedPointsArduino/src/FixedPointsCommon.h"
-
-#include "quickcg.h"
-using namespace QuickCG;
+#include "libs/InstantCG/instantcg.h"
+using namespace InstantCG;
 
 /*
 g++ *.cpp -lSDL -O3 -W -Wall -ansi -pedantic
@@ -217,8 +216,8 @@ int main(int /*argc*/, char */*argv*/[])
     //timing for input and FPS counter
     oldTime = time;
     time = getTicks();
-    print(1.0 / frameTime); //FPS counter
     SQ15x16 frameTime = (time - oldTime) / 1000.0; //frameTime is the time this frame has taken, in seconds
+    //print(1.0 / (double)frameTime); //FPS counter
     redraw();
     cls();
 
