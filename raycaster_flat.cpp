@@ -25,6 +25,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <vector>
 #include <iostream>
+#include "libs/FixedPointsArduino/src/FixedPointsCommon.h"
 
 #include "quickcg.h"
 using namespace QuickCG;
@@ -69,11 +70,37 @@ int worldMap[mapWidth][mapHeight]=
   {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
+
+constexpr std::array<SQ1x14, 450> lookUpSin = []() {
+  std::array<SQ1x14, 450> A = {};
+  for (unsigned i = 0; i < 450; i++) {
+    A[i] = sin(i/180.0*3.14);
+  }
+  return A;
+}();
+
+SQ1x14 sin(SQ15x16 in) {
+  if(in < 0) in += 2; // values between 0 to 2
+
+  in *= 180; // values between 0 and 360*PI
+
+  uint_fast16_t lookupValue = in.getInteger();
+  return lookUpSin[lookupValue];///180.0*3.14));
+}
+
+SQ1x14 cos(SQ15x16 in) {
+  if(in < 0) in += 2; // values between 0 to 2
+  in *= 180; // values between 0 and 360
+  in += 90;
+  uint_fast16_t lookupValue = in.getInteger();
+  return lookUpSin[lookupValue];///180.0*3.14));
+}
+
 int main(int /*argc*/, char */*argv*/[])
 {
-  double posX = 22, posY = 12;  //x and y start position
-  double dirX = -1, dirY = 0; //initial direction vector
-  double planeX = 0, planeY = 0.66; //the 2d raycaster version of camera plane
+  SQ15x16 posX = 22, posY = 12;  //x and y start position
+  SQ1x14 dirX = -1, dirY = 0; //initial direction vector
+  SQ1x14 planeX = 0, planeY = 0.66; //the 2d raycaster version of camera plane
 
   double time = 0; //time of current frame
   double oldTime = 0; //time of previous frame
@@ -84,21 +111,28 @@ int main(int /*argc*/, char */*argv*/[])
     for(int x = 0; x < w; x++)
     {
       //calculate ray position and direction
-      double cameraX = 2 * x / (double)w - 1; //x-coordinate in camera space
-      double rayDirX = dirX + planeX * cameraX;
-      double rayDirY = dirY + planeY * cameraX;
+      SQ15x16 cameraX = 2 * x; //x-coordinate in camera space
+      cameraX /= w;
+      cameraX -= 1;
+      SQ15x16 rayDirX = dirX + planeX * cameraX;
+      SQ15x16 rayDirY = dirY + planeY * cameraX;
       //which box of the map we're in
       int mapX = int(posX);
       int mapY = int(posY);
 
       //length of ray from current position to next x or y-side
-      double sideDistX;
-      double sideDistY;
+      SQ15x16 sideDistX;
+      SQ15x16 sideDistY;
 
-       //length of ray from one x or y-side to next x or y-side
-      double deltaDistX = std::abs(1 / rayDirX);
-      double deltaDistY = std::abs(1 / rayDirY);
-      double perpWallDist;
+      //length of ray from one x or y-side to next x or y-side
+      SQ15x16 deltaDistX = (absFixed(rayDirY) < 0.0001) ? 0 : ((absFixed(rayDirX) < 0.0001) ? 1 : absFixed(1 / rayDirX));
+      if(deltaDistX == 0) {
+        rayDirY = 0;
+      }
+      SQ15x16 deltaDistY = (absFixed(rayDirX) < 0.0001) ? 0 : ((absFixed(rayDirY) < 0.0001) ? 1 : absFixed(1 / rayDirY));
+      if(deltaDistY == 0) {
+        rayDirX = 0;
+      }
 
       //what direction to step in x or y-direction (either +1 or -1)
       int stepX;
@@ -146,18 +180,22 @@ int main(int /*argc*/, char */*argv*/[])
         //Check if ray has hit a wall
         if(worldMap[mapX][mapY] > 0) hit = 1;
       }
+      SQ15x16 perpWallDist;
       //Calculate distance projected on camera direction (Euclidean distance will give fisheye effect!)
-      if(side == 0) perpWallDist = (mapX - posX + (1 - stepX) / 2) / rayDirX;
-      else          perpWallDist = (mapY - posY + (1 - stepY) / 2) / rayDirY;
-
+      if(side == 0) {
+        perpWallDist = (mapX - posX + (1 - stepX) / 2) / rayDirX;
+      } else {
+        perpWallDist = (mapY - posY + (1 - stepY) / 2) / rayDirY;
+      }
       //Calculate height of line to draw on screen
-      int lineHeight = (int)(h / perpWallDist);
+      uint_fast16_t lineHeight = h - 1;
+      if(perpWallDist > 1) {
+        lineHeight = (uint_fast16_t)(h / perpWallDist).getInteger();
+      }
 
       //calculate lowest and highest pixel to fill in current stripe
-      int drawStart = -lineHeight / 2 + h / 2;
-      if(drawStart < 0)drawStart = 0;
-      int drawEnd = lineHeight / 2 + h / 2;
-      if(drawEnd >= h)drawEnd = h - 1;
+      uint_fast16_t drawStart = -lineHeight / 2 + h / 2;
+      uint_fast16_t drawEnd = lineHeight / 2 + h / 2;
 
       //choose wall color
       ColorRGB color;
@@ -179,35 +217,35 @@ int main(int /*argc*/, char */*argv*/[])
     //timing for input and FPS counter
     oldTime = time;
     time = getTicks();
-    double frameTime = (time - oldTime) / 1000.0; //frameTime is the time this frame has taken, in seconds
     print(1.0 / frameTime); //FPS counter
+    SQ15x16 frameTime = (time - oldTime) / 1000.0; //frameTime is the time this frame has taken, in seconds
     redraw();
     cls();
 
     //speed modifiers
-    double moveSpeed = frameTime * 5.0; //the constant value is in squares/second
-    double rotSpeed = frameTime * 3.0; //the constant value is in radians/second
+    SQ15x16 moveSpeed = frameTime * 5.0; //the constant value is in squares/second
+    SQ15x16 rotSpeed = frameTime; //the constant value is in radians/second
     readKeys();
     //move forward if no wall in front of you
     if(keyDown(SDLK_UP))
     {
-      if(worldMap[int(posX + dirX * moveSpeed)][int(posY)] == false) posX += dirX * moveSpeed;
-      if(worldMap[int(posX)][int(posY + dirY * moveSpeed)] == false) posY += dirY * moveSpeed;
+      if(worldMap[(posX + dirX * moveSpeed).getInteger()][(posY).getInteger()] == false) posX += (dirX * moveSpeed);
+      if(worldMap[(posX).getInteger()][(posY + dirY * moveSpeed).getInteger()] == false) posY +=  dirY * moveSpeed;
     }
     //move backwards if no wall behind you
     if(keyDown(SDLK_DOWN))
     {
-      if(worldMap[int(posX - dirX * moveSpeed)][int(posY)] == false) posX -= dirX * moveSpeed;
-      if(worldMap[int(posX)][int(posY - dirY * moveSpeed)] == false) posY -= dirY * moveSpeed;
+      if(worldMap[(posX - dirX * moveSpeed).getInteger()][(posY).getInteger()] == false) posX -= dirX * moveSpeed;
+      if(worldMap[(posX).getInteger()][(posY - dirY * moveSpeed).getInteger()] == false) posY -= dirY * moveSpeed;
     }
     //rotate to the right
     if(keyDown(SDLK_RIGHT))
     {
       //both camera direction and camera plane must be rotated
-      double oldDirX = dirX;
+      SQ1x14 oldDirX = dirX;
       dirX = dirX * cos(-rotSpeed) - dirY * sin(-rotSpeed);
       dirY = oldDirX * sin(-rotSpeed) + dirY * cos(-rotSpeed);
-      double oldPlaneX = planeX;
+      SQ1x14 oldPlaneX = planeX;
       planeX = planeX * cos(-rotSpeed) - planeY * sin(-rotSpeed);
       planeY = oldPlaneX * sin(-rotSpeed) + planeY * cos(-rotSpeed);
     }
@@ -215,10 +253,10 @@ int main(int /*argc*/, char */*argv*/[])
     if(keyDown(SDLK_LEFT))
     {
       //both camera direction and camera plane must be rotated
-      double oldDirX = dirX;
+      SQ1x14 oldDirX = dirX;
       dirX = dirX * cos(rotSpeed) - dirY * sin(rotSpeed);
       dirY = oldDirX * sin(rotSpeed) + dirY * cos(rotSpeed);
-      double oldPlaneX = planeX;
+      SQ1x14 oldPlaneX =  planeX;
       planeX = planeX * cos(rotSpeed) - planeY * sin(rotSpeed);
       planeY = oldPlaneX * sin(rotSpeed) + planeY * cos(rotSpeed);
     }
