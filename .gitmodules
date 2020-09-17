@@ -1,3 +1,6 @@
 [submodule "libs/FixedPointsArduino"]
 	path = libs/FixedPointsArduino
 	url = https://github.com/miracoli/FixedPointsArduino
+[submodule "libs/InstantCG"]
+	path = libs/InstantCG
+	url = https://github.com/thomashope/InstantCG
