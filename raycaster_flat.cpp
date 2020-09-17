@@ -101,13 +101,13 @@ int main(int /*argc*/, char */*argv*/[])
   SQ1x14 dirX = -1, dirY = 0; //initial direction vector
   SQ1x14 planeX = 0, planeY = 0.66; //the 2d raycaster version of camera plane
 
-  double time = 0; //time of current frame
-  double oldTime = 0; //time of previous frame
+  unsigned int time = 0; //time of current frame
+  unsigned int oldTime = 0; //time of previous frame
 
   screen(screenWidth, screenHeight, 0, "Raycaster");
   while(!done())
   {
-    for(int x = 0; x < w; x++)
+    for(uint_fast16_t x = 0; x < w; x++)
     {
       //calculate ray position and direction
       SQ15x16 cameraX = 2 * x; //x-coordinate in camera space
@@ -116,8 +116,8 @@ int main(int /*argc*/, char */*argv*/[])
       SQ15x16 rayDirX = dirX + planeX * cameraX;
       SQ15x16 rayDirY = dirY + planeY * cameraX;
       //which box of the map we're in
-      int mapX = int(posX);
-      int mapY = int(posY);
+      uint_fast8_t mapX = posX.getInteger();
+      uint_fast8_t mapY = posY.getInteger();
 
       //length of ray from current position to next x or y-side
       SQ15x16 sideDistX;
@@ -134,10 +134,10 @@ int main(int /*argc*/, char */*argv*/[])
       }
 
       //what direction to step in x or y-direction (either +1 or -1)
-      int stepX;
-      int stepY;
+      int_fast8_t stepX;
+      int_fast8_t stepY;
 
-      int hit = 0; //was there a wall hit?
+      bool hit = 0; //was there a wall hit?
       int side; //was a NS or a EW wall hit?
       //calculate step and initial sideDist
       if(rayDirX < 0)
