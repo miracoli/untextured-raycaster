@@ -1,0 +1,3 @@
+[submodule "libs/FixedPointsArduino"]
+	path = libs/FixedPointsArduino
+	url = https://github.com/miracoli/FixedPointsArduino
